@@ -1,0 +1,46 @@
+name: IB Job Agent
+
+on:
+  schedule:
+    - cron: "0 12 * * *"   # Daily at 8 AM ET (noon UTC)
+  workflow_dispatch:         # Manual trigger from GitHub UI
+
+jobs:
+  search-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Restore seen postings cache
+        uses: actions/cache@v4
+        with:
+          path: seen_postings.json
+          key: seen-postings-${{ github.run_id }}
+          restore-keys: |
+            seen-postings-
+
+      - name: Run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          GMAIL_MCP_URL: ${{ secrets.GMAIL_MCP_URL }}
+          GMAIL_MCP_TOKEN: ${{ secrets.GMAIL_MCP_TOKEN }}
+        run: python agent.py
+
+      - name: Upload agent log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-log-${{ github.run_id }}
+          path: agent.log
+          retention-days: 14
